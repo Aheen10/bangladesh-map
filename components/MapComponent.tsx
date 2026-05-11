@@ -38,17 +38,46 @@ const createColoredIcon = (color: string) =>
     popupAnchor: [0, -10],
   });
 
+async function fetchWikipediaSummary(nameEn: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(nameEn + " District")}`
+    );
+    const data = await res.json();
+    if (data.extract) return data.extract;
+    const res2 = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(nameEn)}`
+    );
+    const data2 = await res2.json();
+    return data2.extract || "No description available.";
+  } catch {
+    return "Could not load description.";
+  }
+}
+
 export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
   const [districts, setDistricts] = useState<District[]>([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<District | null>(null);
   const [divFilter, setDivFilter] = useState("all");
+  const [wikiText, setWikiText] = useState<string>("");
+  const [wikiLoading, setWikiLoading] = useState(false);
 
   useEffect(() => {
     fetch("/districts.json")
       .then((res) => res.json())
       .then((data) => setDistricts(data));
   }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    setWikiText("");
+    setWikiLoading(true);
+    fetchWikipediaSummary(selected.nameEn).then((text) => {
+      setWikiText(text);
+      setWikiLoading(false);
+    });
+  }, [selected]);
 
   const divisions = Array.from(new Set(districts.map((d) => d.division)));
 
@@ -123,16 +152,19 @@ export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
       {/* Map + Info */}
       <div className="flex-1 flex flex-col">
         {selected && (
-          <div className="bg-white border-b shadow p-4 flex gap-6 items-start"
+          <div className="bg-white border-b shadow p-4 flex gap-4 items-start max-h-64 overflow-y-auto"
             style={{ borderTop: `4px solid ${divisionColors[selected.division]}` }}>
             <div className="flex-1">
-              <h2 className="text-xl font-bold" style={{ color: divisionColors[selected.division] }}>
-                {lang === "bn" ? selected.name : selected.nameEn}
-              </h2>
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-xl font-bold" style={{ color: divisionColors[selected.division] }}>
+                  {lang === "bn" ? selected.name : selected.nameEn}
+                </h2>
+                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl ml-4">✕</button>
+              </div>
               <p className="text-sm text-gray-500 mb-2">
                 {lang === "bn" ? selected.division : selected.divisionEn} {lang === "bn" ? "বিভাগ" : "Division"}
               </p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                 <div className="bg-gray-50 rounded p-2">
                   <p className="text-gray-400 text-xs">{lang === "bn" ? "জনসংখ্যা" : "Population"}</p>
                   <p className="font-semibold">{selected.population.toLocaleString()}</p>
@@ -142,12 +174,23 @@ export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
                   <p className="font-semibold">{selected.area} km²</p>
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-gray-600 mb-3">
                 <span className="font-medium">{lang === "bn" ? "বিখ্যাত: " : "Famous for: "}</span>
                 {lang === "bn" ? selected.famousFor : selected.famousForEn}
               </p>
+
+              {/* Wikipedia Section */}
+              <div className="border-t pt-3">
+                <p className="text-xs font-semibold text-gray-400 mb-1 flex items-center gap-1">
+                  <span>📖</span> Wikipedia
+                </p>
+                {wikiLoading ? (
+                  <p className="text-sm text-gray-400 animate-pulse">Loading Wikipedia...</p>
+                ) : (
+                  <p className="text-sm text-gray-600 leading-relaxed">{wikiText}</p>
+                )}
+              </div>
             </div>
-            <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
           </div>
         )}
 
