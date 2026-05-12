@@ -18,6 +18,14 @@ interface District {
   lng: number;
 }
 
+interface WeatherData {
+  temp: number;
+  description: string;
+  icon: string;
+  humidity: number;
+  wind: number;
+}
+
 const divisionColors: Record<string, string> = {
   "ঢাকা": "#e74c3c",
   "চট্টগ্রাম": "#e67e22",
@@ -55,6 +63,25 @@ async function fetchWikipediaSummary(nameEn: string): Promise<string> {
   }
 }
 
+async function fetchWeather(lat: number, lng: number): Promise<WeatherData | null> {
+  try {
+    const key = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${key}&units=metric`
+    );
+    const data = await res.json();
+    return {
+      temp: Math.round(data.main.temp),
+      description: data.weather[0].description,
+      icon: data.weather[0].icon,
+      humidity: data.main.humidity,
+      wind: Math.round(data.wind.speed),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
   const [districts, setDistricts] = useState<District[]>([]);
   const [search, setSearch] = useState("");
@@ -62,6 +89,8 @@ export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
   const [divFilter, setDivFilter] = useState("all");
   const [wikiText, setWikiText] = useState<string>("");
   const [wikiLoading, setWikiLoading] = useState(false);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   useEffect(() => {
     fetch("/districts.json")
@@ -73,9 +102,17 @@ export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
     if (!selected) return;
     setWikiText("");
     setWikiLoading(true);
+    setWeather(null);
+    setWeatherLoading(true);
+
     fetchWikipediaSummary(selected.nameEn).then((text) => {
       setWikiText(text);
       setWikiLoading(false);
+    });
+
+    fetchWeather(selected.lat, selected.lng).then((data) => {
+      setWeather(data);
+      setWeatherLoading(false);
     });
   }, [selected]);
 
@@ -113,7 +150,6 @@ export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
           </select>
         </div>
 
-        {/* Division Legend */}
         <div className="px-3 py-2 border-b bg-gray-50 flex flex-wrap gap-1">
           {Object.entries(divisionColors).map(([div, color]) => (
             <span
@@ -152,44 +188,70 @@ export default function MapComponent({ lang }: { lang: "bn" | "en" }) {
       {/* Map + Info */}
       <div className="flex-1 flex flex-col">
         {selected && (
-          <div className="bg-white border-b shadow p-4 flex gap-4 items-start max-h-64 overflow-y-auto"
+          <div className="bg-white border-b shadow p-4 max-h-72 overflow-y-auto"
             style={{ borderTop: `4px solid ${divisionColors[selected.division]}` }}>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
+            <div className="flex items-start justify-between mb-2">
+              <div>
                 <h2 className="text-xl font-bold" style={{ color: divisionColors[selected.division] }}>
                   {lang === "bn" ? selected.name : selected.nameEn}
                 </h2>
-                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl ml-4">✕</button>
-              </div>
-              <p className="text-sm text-gray-500 mb-2">
-                {lang === "bn" ? selected.division : selected.divisionEn} {lang === "bn" ? "বিভাগ" : "Division"}
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                <div className="bg-gray-50 rounded p-2">
-                  <p className="text-gray-400 text-xs">{lang === "bn" ? "জনসংখ্যা" : "Population"}</p>
-                  <p className="font-semibold">{selected.population.toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-50 rounded p-2">
-                  <p className="text-gray-400 text-xs">{lang === "bn" ? "আয়তন" : "Area"}</p>
-                  <p className="font-semibold">{selected.area} km²</p>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-3">
-                <span className="font-medium">{lang === "bn" ? "বিখ্যাত: " : "Famous for: "}</span>
-                {lang === "bn" ? selected.famousFor : selected.famousForEn}
-              </p>
-
-              {/* Wikipedia Section */}
-              <div className="border-t pt-3">
-                <p className="text-xs font-semibold text-gray-400 mb-1 flex items-center gap-1">
-                  <span>📖</span> Wikipedia
+                <p className="text-sm text-gray-500">
+                  {lang === "bn" ? selected.division : selected.divisionEn} {lang === "bn" ? "বিভাগ" : "Division"}
                 </p>
-                {wikiLoading ? (
-                  <p className="text-sm text-gray-400 animate-pulse">Loading Wikipedia...</p>
-                ) : (
-                  <p className="text-sm text-gray-600 leading-relaxed">{wikiText}</p>
-                )}
               </div>
+              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+              <div className="bg-gray-50 rounded p-2">
+                <p className="text-gray-400 text-xs">{lang === "bn" ? "জনসংখ্যা" : "Population"}</p>
+                <p className="font-semibold">{selected.population.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-50 rounded p-2">
+                <p className="text-gray-400 text-xs">{lang === "bn" ? "আয়তন" : "Area"}</p>
+                <p className="font-semibold">{selected.area} km²</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-3">
+              <span className="font-medium">{lang === "bn" ? "বিখ্যাত: " : "Famous for: "}</span>
+              {lang === "bn" ? selected.famousFor : selected.famousForEn}
+            </p>
+
+            {/* Weather Section */}
+            <div className="bg-blue-50 rounded-lg p-3 mb-3">
+              <p className="text-xs font-semibold text-blue-500 mb-1">🌤️ {lang === "bn" ? "আবহাওয়া" : "Current Weather"}</p>
+              {weatherLoading ? (
+                <p className="text-sm text-gray-400 animate-pulse">Loading weather...</p>
+              ) : weather ? (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={`https://openweathermap.org/img/wn/${weather.icon}@2x.png`}
+                    alt="weather"
+                    className="w-12 h-12"
+                  />
+                  <div>
+                    <p className="text-2xl font-bold text-blue-700">{weather.temp}°C</p>
+                    <p className="text-xs text-gray-500 capitalize">{weather.description}</p>
+                  </div>
+                  <div className="ml-auto text-xs text-gray-500">
+                    <p>💧 {weather.humidity}%</p>
+                    <p>💨 {weather.wind} m/s</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Weather unavailable</p>
+              )}
+            </div>
+
+            {/* Wikipedia Section */}
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-gray-400 mb-1">📖 Wikipedia</p>
+              {wikiLoading ? (
+                <p className="text-sm text-gray-400 animate-pulse">Loading Wikipedia...</p>
+              ) : (
+                <p className="text-sm text-gray-600 leading-relaxed">{wikiText}</p>
+              )}
             </div>
           </div>
         )}
