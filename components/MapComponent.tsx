@@ -57,16 +57,10 @@ function FlyToDistrict({ district }: { district: District | null }) {
 
 async function fetchWikipediaSummary(nameEn: string): Promise<string> {
   try {
-    const res = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(nameEn + " District")}`
-    );
+    const res = await fetch(`/api/wiki?name=${encodeURIComponent(nameEn)}`);
+    if (!res.ok) return "Could not load description.";
     const data = await res.json();
-    if (data.extract) return data.extract.slice(0, 500);
-    const res2 = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(nameEn)}`
-    );
-    const data2 = await res2.json();
-    return data2.extract || "No description available.";
+    return data.extract || "No description available.";
   } catch {
     return "Could not load description.";
   }
@@ -74,18 +68,9 @@ async function fetchWikipediaSummary(nameEn: string): Promise<string> {
 
 async function fetchWeather(lat: number, lng: number): Promise<WeatherData | null> {
   try {
-    const key = process.env.NEXT_PUBLIC_WEATHER_API_KEY || "a8f6aa5da9c62c9005c7a07e23b60190";
-    const res = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${key}&units=metric`
-    );
-    const data = await res.json();
-    return {
-      temp: Math.round(data.main.temp),
-      description: data.weather[0].description,
-      icon: data.weather[0].icon,
-      humidity: data.main.humidity,
-      wind: Math.round(data.wind.speed),
-    };
+    const res = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
+    if (!res.ok) return null;
+    return await res.json();
   } catch {
     return null;
   }
