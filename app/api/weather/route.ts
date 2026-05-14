@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ratelimit } from "../../lib/rateLimit";
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
+  const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
@@ -13,7 +32,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const res = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric`
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric`,
+      { next: { revalidate: 1800 } }
     );
 
     if (!res.ok) {
@@ -22,13 +42,21 @@ export async function GET(request: NextRequest) {
 
     const data = await res.json();
 
-    return NextResponse.json({
-      temp: Math.round(data.main.temp),
-      description: data.weather[0].description,
-      icon: data.weather[0].icon,
-      humidity: data.main.humidity,
-      wind: Math.round(data.wind.speed),
-    });
+    return NextResponse.json(
+      {
+        temp: Math.round(data.main.temp),
+        description: data.weather[0].description,
+        icon: data.weather[0].icon,
+        humidity: data.main.humidity,
+        wind: Math.round(data.wind.speed),
+      },
+      {
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+        },
+      }
+    );
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
