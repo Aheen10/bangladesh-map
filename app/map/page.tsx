@@ -2,14 +2,12 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import ErrorBoundary from "../../components/ErrorBoundary";
+import LoadingSkeleton from "../../components/LoadingSkeleton";
 
 const MapComponent = dynamic(() => import("../../components/MapComponent"), {
   ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full bg-green-50">
-      <p className="text-green-700 text-xl">মানচিত্র লোড হচ্ছে...</p>
-    </div>
-  ),
+  loading: () => <LoadingSkeleton />,
 });
 
 export default function MapPage() {
@@ -30,7 +28,9 @@ export default function MapPage() {
         </button>
       </header>
       <div className="flex-1 overflow-hidden">
-        <MapComponent lang={lang} />
+        <ErrorBoundary>
+          <MapComponent lang={lang} />
+        </ErrorBoundary>
       </div>
     </div>
   );

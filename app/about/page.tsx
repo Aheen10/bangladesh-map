@@ -85,7 +85,6 @@ export default function AboutPage() {
             </div>
             <div>
               <p className="font-bold text-gray-800">Aheen Khan</p>
-              <p className="text-sm text-gray-500">4th Year Student</p>
               
                 <Link href="https://github.com/Aheen10" className="text-sm text-green-600 hover:text-green-800 font-medium">github.com/Aheen10</Link>
             </div>
