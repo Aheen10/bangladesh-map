@@ -20,6 +20,12 @@ export default function Home() {
           >
             📊 পরিসংখ্যান দেখুন
           </Link>
+          <Link
+            href="/about"
+            className="bg-transparent border-2 border-white text-white font-bold px-8 py-4 rounded-full text-lg hover:bg-white/10 transition"
+          >
+            ℹ️ About
+          </Link>
         </div>
       </div>
     </main>
